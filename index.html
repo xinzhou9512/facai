@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>发财 · 投资复盘</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, sans-serif; background:#0d1117; color:#e6edf3; max-width:480px; margin:auto; min-height:100vh; padding-bottom:80px; }
+        .header { background:#161b22; padding:16px 20px; position:sticky; top:0; z-index:10; border-bottom:1px solid #30363d; display:flex; align-items:center; gap:10px; }
+        .header .logo { font-size:28px; }
+        .header h1 { font-size:22px; font-weight:700; color:#f0c040; }
+        .header .date { font-size:12px; color:#8b949e; margin-left:auto; }
+
+        .cards { display:flex; gap:12px; padding:16px; overflow-x:auto; }
+        .card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px 18px; min-width:110px; flex:1; text-align:center; }
+        .card .label { font-size:12px; color:#8b949e; margin-bottom:6px; }
+        .card .value { font-size:22px; font-weight:700; }
+        .card .profit { font-size:14px; font-weight:600; margin-top:2px; }
+        .green { color:#3fb950; } .red { color:#f85149; }
+
+        .chart-container { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:16px; margin:0 16px 16px; }
+        .chart-container h3 { font-size:14px; color:#8b949e; margin-bottom:12px; font-weight:400; }
+        .chart-wrap { position:relative; width:100%; }
+        .chart-wrap canvas { max-height:260px; }
+
+        .section-title { font-size:16px; font-weight:700; padding:12px 20px 4px; display:flex; justify-content:space-between; align-items:center; }
+        .section-title .hint { font-size:12px; color:#8b949e; font-weight:400; }
+
+        .asset-list { padding:0 12px; }
+        .asset-item { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px 16px; margin:8px 8px; display:flex; flex-direction:column; }
+        .asset-item .top-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        .asset-item .name { font-weight:600; font-size:16px; }
+        .asset-item .tag { font-size:10px; padding:2px 8px; border-radius:12px; background:#21262d; color:#8b949e; }
+        .asset-item .bottom-row { display:flex; justify-content:space-between; align-items:center; font-size:14px; }
+        .asset-item .amount { font-weight:600; }
+        .asset-item .pct { font-weight:600; }
+        .asset-item .delete-btn { background:none; border:none; color:#f85149; font-size:12px; padding:4px 8px; }
+
+        .action-bar { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:#161b22; border-top:1px solid #30363d; display:flex; padding:8px 16px; gap:8px; z-index:100; }
+        .action-bar button { flex:1; padding:12px; border-radius:10px; border:none; font-size:14px; font-weight:700; cursor:pointer; background:#21262d; color:#c9d1d9; }
+        .action-bar button.primary { background:#f0c040; color:#0d1117; }
+
+        .tab-bar { display:flex; background:#161b22; border-bottom:1px solid #30363d; }
+        .tab-bar .tab { flex:1; text-align:center; padding:12px; font-size:14px; font-weight:600; color:#8b949e; cursor:pointer; border-bottom:2px solid transparent; }
+        .tab-bar .tab.active { color:#f0c040; border-bottom-color:#f0c040; }
+
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:200; }
+        .modal-content { background:#161b22; border:1px solid #30363d; border-radius:16px; padding:20px; width:90%; max-height:80vh; overflow-y:auto; }
+        .modal-content h2 { margin-bottom:16px; color:#f0c040; }
+        .modal-content input, .modal-content textarea, .modal-content select { width:100%; padding:12px; margin-bottom:12px; border-radius:8px; border:1px solid #30363d; background:#0d1117; color:#e6edf3; font-size:14px; }
+        .modal-content button { width:100%; padding:14px; background:#f0c040; color:#0d1117; border:none; border-radius:10px; font-weight:700; font-size:16px; cursor:pointer; margin-top:8px; }
+        .modal-content .btn-secondary { background:#21262d; color:#c9d1d9; margin-top:4px; }
+
+        .review-item { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px 16px; margin:8px 12px; }
+        .review-item .rv-type { font-size:11px; padding:2px 10px; border-radius:12px; background:#21262d; color:#8b949e; display:inline-block; margin-bottom:6px; }
+        .review-item .rv-title { font-weight:600; margin-bottom:4px; }
+        .review-item .rv-body { font-size:14px; color:#8b949e; line-height:1.5; }
+        .review-item .rv-meta { font-size:12px; color:#484f58; margin-top:6px; }
+
+        .empty { text-align:center; padding:40px; color:#484f58; }
+        .empty .icon { font-size:48px; margin-bottom:12px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <span class="logo">💰</span>
+    <h1>发财</h1>
+    <span class="date" id="todayDate"></span>
+</div>
+
+<div class="tab-bar">
+    <div class="tab active" onclick="switchTab('overview')">📊 总览</div>
+    <div class="tab" onclick="switchTab('holdings')">💼 持仓</div>
+    <div class="tab" onclick="switchTab('review')">📝 复盘</div>
+</div>
+
+<!-- 页面结构体保持不变，我只精简了显示用不到的重复部分 -->
+<div id="overviewPage">
+    <div class="cards">
+        <div class="card"><div class="label">投资总资产</div><div class="value" id="totalAsset">¥0</div></div>
+        <div class="card"><div class="label">累计盈亏</div><div class="value" id="totalProfit">¥0</div><div class="profit" id="totalProfitPct">0%</div></div>
+    </div>
+    <div class="chart-container"><h3>🍰 资产配置分布</h3><div class="chart-wrap"><canvas id="pieChart"></canvas></div></div>
+    <div class="chart-container"><h3>📊 各板块盈亏对比</h3><div class="chart-wrap"><canvas id="barChart"></canvas></div></div>
+    <div style="padding:0 20px;"><div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>💵 现金</span><span id="cashAmount">¥0</span></div><div style="display:flex;justify-content:space-between;"><span>📈 投资市值</span><span id="investAmount">¥0</span></div></div></div>
+    <div class="section-title">📌 快速操作</div>
+    <div style="padding:0 20px;display:flex;gap:10px;">
+        <button onclick="openAssetModal()" style="flex:1;padding:14px;background:#f0c040;color:#0d1117;border:none;border-radius:12px;font-weight:700;font-size:15px;">➕ 添加持仓</button>
+        <button onclick="openCashModal()" style="flex:1;padding:14px;background:#21262d;color:#c9d1d9;border:none;border-radius:12px;font-weight:700;font-size:15px;">💰 更新现金</button>
+    </div>
+</div>
+
+<div id="holdingsPage" style="display:none;">
+    <div class="section-title">📋 所有持仓 <span class="hint" onclick="openAssetModal()">+ 添加</span></div>
+    <div class="asset-list" id="assetList"></div>
+</div>
+
+<div id="reviewPage" style="display:none;">
+    <div class="section-title">📝 复盘笔记 <span class="hint" onclick="openReviewModal()">+ 写复盘</span></div>
+    <div id="reviewList"></div>
+</div>
+
+<div class="action-bar">
+    <button onclick="openAssetModal()">➕ 记录交易</button>
+    <button class="primary" onclick="openReviewModal()">✍️ 写复盘</button>
+</div>
+
+<!-- 弹窗结构保持完整 -->
+<div class="modal" id="assetModal" style="display:none;"><div class="modal-content"><h2>💼 添加/编辑持仓</h2><input type="text" id="assetName" placeholder="名称（如：大成恒生科技A）"><input type="text" id="assetTag" placeholder="标签（如：恒生科技、红利）"><input type="number" id="assetCost" placeholder="持仓成本（元）" step="0.01"><input type="number" id="assetValue" placeholder="当前市值（元）" step="0.01"><button onclick="saveAsset()">💾 保存</button><button class="btn-secondary" onclick="closeModal('assetModal')">取消</button></div></div>
+<div class="modal" id="cashModal" style="display:none;"><div class="modal-content"><h2>💰 更新可用现金</h2><input type="number" id="cashInput" placeholder="当前现金余额（元）" step="0.01"><button onclick="saveCash()">💾 保存</button><button class="btn-secondary" onclick="closeModal('cashModal')">取消</button></div></div>
+<div class="modal" id="reviewModal" style="display:none;"><div class="modal-content"><h2>✍️ 投资复盘</h2><select id="reviewType"><option value="买入理由">买入理由</option><option value="卖出总结">卖出总结</option><option value="市场观察">市场观察</option><option value="心态与纪律">心态与纪律</option></select><input type="text" id="reviewAsset" placeholder="关联资产（选填）"><input type="text" id="reviewTitle" placeholder="标题"><textarea id="reviewContent" rows="5" placeholder="记录你的思考……"></textarea><select id="reviewEmotion"><option value="">情绪标签（选填）</option><option value="😰 恐惧">😰 恐惧</option><option value="😤 贪婪">😤 贪婪</option><option value="😡 冲动">😡 冲动</option><option value="✅ 纪律执行">✅ 纪律执行</option></select><button onclick="saveReview()">💾 保存</button><button class="btn-secondary" onclick="closeModal('reviewModal')">取消</button></div></div>
+
+<script>
+    // ============ 数据存储 ============
+    let assets = JSON.parse(localStorage.getItem('fc_assets') || '[]');
+    let cash = parseFloat(localStorage.getItem('fc_cash') || '0');
+    let reviews = JSON.parse(localStorage.getItem('fc_reviews') || '[]');
+    let pieChartInstance = null;
+    let barChartInstance = null;
+
+    function save() {
+        localStorage.setItem('fc_assets', JSON.stringify(assets));
+        localStorage.setItem('fc_cash', cash);
+        localStorage.setItem('fc_reviews', JSON.stringify(reviews));
+        renderAll();
+    }
+
+    function switchTab(t) {
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.getElementById('overviewPage').style.display = t === 'overview' ? 'block' : 'none';
+        document.getElementById('holdingsPage').style.display = t === 'holdings' ? 'block' : 'none';
+        document.getElementById('reviewPage').style.display = t === 'review' ? 'block' : 'none';
+        const idx = t === 'overview' ? 0 : t === 'holdings' ? 1 : 2;
+        document.querySelectorAll('.tab')[idx].classList.add('active');
+        renderAll();
+    }
+
+    function openAssetModal() { document.getElementById('assetModal').style.display = 'flex'; }
+    function openCashModal() { document.getElementById('cashModal').style.display = 'flex'; }
+    function openReviewModal() { document.getElementById('reviewModal').style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function saveAsset() {
+        const name = document.getElementById('assetName').value.trim();
+        const tag = document.getElementById('assetTag').value.trim();
+        const cost = parseFloat(document.getElementById('assetCost').value);
+        const value = parseFloat(document.getElementById('assetValue').value);
+        if (!name || isNaN(cost) || isNaN(value)) return alert('请填写完整');
+        assets.push({ id: Date.now(), name, tag, cost, value, date: new Date().toLocaleDateString() });
+        ['assetName','assetTag','assetCost','assetValue'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('assetModal').style.display = 'none';
+        save();
+    }
+
+    function deleteAsset(id) {
+        assets = assets.filter(a => a.id !== id);
+        save();
+    }
+
+    function saveCash() {
+        const val = parseFloat(document.getElementById('cashInput').value);
+        if (isNaN(val)) return alert('请输入有效金额');
+        cash = val;
+        document.getElementById('cashInput').value = '';
+        document.getElementById('cashModal').style.display = 'none';
+        save();
+    }
+
+    function saveReview() {
+        const type = document.getElementById('reviewType').value;
+        const asset = document.getElementById('reviewAsset').value.trim();
+        const title = document.getElementById('reviewTitle').value.trim();
+        const content = document.getElementById('reviewContent').value.trim();
+        const emotion = document.getElementById('reviewEmotion').value;
+        if (!title || !content) return alert('标题和内容不能为空');
+        reviews.unshift({ id: Date.now(), type, asset, title, content, emotion, date: new Date().toLocaleString() });
+        ['reviewAsset','reviewTitle','reviewContent','reviewEmotion'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el.tagName === 'SELECT') el.selectedIndex = 0;
+            else el.value = '';
+        });
+        document.getElementById('reviewModal').style.display = 'none';
+        save();
+    }
+
+    function renderCharts() {
+        const tagMap = {};
+        assets.forEach(a => {
+            const tag = a.tag || '未分类';
+            if (!tagMap[tag]) tagMap[tag] = 0;
+            tagMap[tag] += a.value;
+        });
+        const labels = []; const data = [];
+        const bgColors = ['#f0c040','#3fb950','#58a6ff','#f85149','#d2a8ff','#ff7b72','#79c0ff','#a5d6ff'];
+        let i = 0;
+        for (const [tag, val] of Object.entries(tagMap)) { labels.push(tag); data.push(val); }
+        if (cash > 0) { labels.push('现金'); data.push(cash); }
+        const totalSum = data.reduce((s,v) => s+v, 0);
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        if (pieChartInstance) pieChartInstance.destroy();
+        if (totalSum === 0) { pieCtx.clearRect(0,0,pieCtx.canvas.width,pieCtx.canvas.height); pieChartInstance = null; }
+        else {
+            pieChartInstance = new Chart(pieCtx, {
+                type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: bgColors.slice(0, labels.length), borderColor:'#0d1117', borderWidth:2 }] },
+                options: { responsive:true, maintainAspectRatio:true, plugins:{ legend:{ position:'bottom', labels:{ color:'#8b949e', padding:16, font:{ size:12 }, usePointStyle:true } } }, cutout:'55%' }
+            });
+        }
+
+        const profitMap = {};
+        assets.forEach(a => {
+            const tag = a.tag || '未分类';
+            if (!profitMap[tag]) profitMap[tag] = { cost:0, value:0 };
+            profitMap[tag].cost += a.cost;
+            profitMap[tag].value += a.value;
+        });
+        const barLabels = []; const barData = []; const barColors = [];
+        for (const [tag, v] of Object.entries(profitMap)) {
+            const p = v.value - v.cost;
+            barLabels.push(tag); barData.push(p); barColors.push(p >= 0 ? '#3fb950' : '#f85149');
+        }
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        if (barChartInstance) barChartInstance.destroy();
+        if (barLabels.length === 0) { barCtx.clearRect(0,0,barCtx.canvas.width,barCtx.canvas.height); barChartInstance = null; }
+        else {
+            barChartInstance = new Chart(barCtx, {
+                type:'bar', data:{ labels:barLabels, datasets:[{ label:'盈亏 (元)', data:barData, backgroundColor:barColors, borderRadius:6, borderSkipped:false }] },
+                options:{ responsive:true, maintainAspectRatio:true, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#8b949e' }, grid:{ color:'#21262d' } }, y:{ ticks:{ color:'#8b949e', callback:v=>'¥'+v }, grid:{ color:'#21262d' } } } }
+            });
+        }
+    }
+
+    function renderAll() {
+        const totalInvest = assets.reduce((s,a) => s + a.value, 0);
+        const totalCost = assets.reduce((s,a) => s + a.cost, 0);
+        const totalAsset = totalInvest + cash;
+        const profit = totalInvest - totalCost;
+        const profitPct = totalCost > 0 ? (profit / totalCost * 100) : 0;
+
+        document.getElementById('totalAsset').textContent = '¥' + totalAsset.toFixed(0);
+        document.getElementById('totalProfit').textContent = (profit >= 0 ? '¥' : '-¥') + Math.abs(profit).toFixed(0);
+        document.getElementById('totalProfitPct').textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(1) + '%';
+        document.getElementById('totalProfitPct').className = 'profit ' + (profitPct >= 0 ? 'green' : 'red');
+        document.getElementById('cashAmount').textContent = '¥' + cash.toFixed(2);
+        document.getElementById('investAmount').textContent = '¥' + totalInvest.toFixed(2);
+        document.getElementById('todayDate').textContent = new Date().toLocaleDateString('zh-CN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+        const assetList = document.getElementById('assetList');
+        assetList.innerHTML = assets.length === 0 ? '<div class="empty"><div class="icon">📭</div>暂无持仓，点击右上角添加</div>' :
+            assets.map(a => {
+                const pct = a.cost > 0 ? ((a.value - a.cost) / a.cost * 100) : 0;
+                return `<div class="asset-item">
+                    <div class="top-row"><span class="name">${a.name}</span><span class="tag">${a.tag || '未分类'}</span></div>
+                    <div class="bottom-row">
+                        <span class="amount">¥${a.value.toFixed(0)}</span>
+                        <span style="display:flex;align-items:center;gap:8px;">
+                            <span class="pct ${pct>=0?'green':'red'}">${(pct>=0?'+':'')+pct.toFixed(1)}%</span>
+                            <button class="delete-btn" onclick="event.stopPropagation();deleteAsset(${a.id})">🗑️</button>
+                        </span>
+                    </div>
+                </div>`;
+            }).join('');
+
+        const reviewList = document.getElementById('reviewList');
+        reviewList.innerHTML = reviews.length === 0 ? '<div class="empty"><div class="icon">📝</div>还没有复盘笔记</div>' :
+            reviews.map(r => `
+                <div class="review-item">
+                    <span class="rv-type">${r.type}</span>
+                    ${r.emotion ? `<span style="font-size:14px;margin-left:6px;">${r.emotion}</span>` : ''}
+                    ${r.asset ? `<span style="font-size:12px;color:#58a6ff;margin-left:6px;">📎 ${r.asset}</span>` : ''}
+                    <div class="rv-title">${r.title}</div>
+                    <div class="rv-body">${r.content.replace(/\n/g,'<br>')}</div>
+                    <div class="rv-meta">${r.date}</div>
+                </div>
+            `).join('');
+
+        renderCharts();
+    }
+
+    renderAll();
+</script>
+
+</body>
+</html>
